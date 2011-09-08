@@ -40,6 +40,7 @@ module Saulabs::EmbedAssets
     # CSS asset-embedding regexes for URL rewriting.
     EMBED_DETECTOR  = /url\(['"]?([^\s)]+\.[a-z]+)(\?\d+)?['"]?\)/
     EMBEDDABLE      = /[\A\/]embed\//
+    NOT_EMBEDDABLE  = /_ie/i
 
     def with_data_uris(css)
       css.gsub(EMBED_DETECTOR) do |url|
@@ -61,6 +62,7 @@ module Saulabs::EmbedAssets
     def embeddable?(asset_path)
       font = EMBED_FONTS.include?(asset_path.extname)
       return false unless asset_path.to_s.match(EMBEDDABLE) && asset_path.exist?
+      return false if asset_path.to_s =~ NOT_EMBEDDABLE
       return false unless EMBED_EXTS.include?(asset_path.extname)
       return false unless font || encoded_contents(asset_path).length < MAX_IMAGE_SIZE
       return true
