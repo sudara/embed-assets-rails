@@ -8,7 +8,7 @@ module Saulabs::EmbedAssets
 
     def evaluate(context, locals, &block)
       @asset_contents = {}
-      embed_assets_enabled? ? with_data_uris(data) : data
+      embed_assets_enabled? ? with_data_uris(context,data) : data
     end
 
     def embed_assets_enabled?
@@ -40,16 +40,16 @@ module Saulabs::EmbedAssets
     # CSS asset-embedding regexes for URL rewriting.
     EMBED_DETECTOR  = /url\(['"]?([^\s)]+\.[a-z]+)(\?\d+)?['"]?\)/
     EMBEDDABLE      = /[\A\/]embed\//
-    NOT_EMBEDDABLE  = /_ie/i
+    NOT_EMBEDDABLE  = /_ie|ie\// # either _ie suffix on file or /ie/ in path
 
-    def with_data_uris(css)
+    def with_data_uris(file, css)
       css.gsub(EMBED_DETECTOR) do |url|
         asset_path = Pathname.new($1)
-        public_path = absolute_path(asset_path)
-        if URI.parse($1).absolute? || !embeddable?(public_path)
+        real_path = absolute_path(asset_path)
+        if URI.parse($1).absolute? || !embeddable?(file.logical_path, real_path)
           "url(#{$1})"
         else
-          "url(\"data:#{mime_type($1)};charset=utf-8;base64,#{encoded_contents(public_path.to_s)}\")"
+          "url(\"data:#{mime_type($1)};charset=utf-8;base64,#{encoded_contents(real_path.to_s)}\")"
         end
       end
     end
@@ -59,12 +59,12 @@ module Saulabs::EmbedAssets
     # Data-URIs larger than 32K, and you probably shouldn't be embedding assets
     # that large in any case. Because we need to check the base64 length here,
     # save it so that we don't have to compute it again later.
-    def embeddable?(asset_path)
-      font = EMBED_FONTS.include?(asset_path.extname)
-      return false unless asset_path.to_s.match(EMBEDDABLE) && asset_path.exist?
-      return false if asset_path.to_s =~ NOT_EMBEDDABLE
-      return false unless EMBED_EXTS.include?(asset_path.extname)
-      return false unless font || encoded_contents(asset_path).length < MAX_IMAGE_SIZE
+    def embeddable?(logical_path, real_path)
+      font = EMBED_FONTS.include?(real_path.extname)
+      return false unless real_path.to_s.match(EMBEDDABLE) && real_path.exist?
+      return false if logical_path.to_s.match(NOT_EMBEDDABLE)
+      return false unless EMBED_EXTS.include?(real_path.extname)
+      return false unless font || encoded_contents(real_path).length < MAX_IMAGE_SIZE
       return true
     end
 
